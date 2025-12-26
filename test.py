@@ -5,7 +5,7 @@ import math
 import time
 import random
 
-# ===== HIGHWAY DASH 3D: COMBAT EDITION (Level Up Update) =====
+# ===== HIGHWAY DASH 3D: COMBAT EDITION (Cheat Mode Update) =====
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 800
 
@@ -21,12 +21,13 @@ CUSTOM_RACE_MENU = 6
 game_state = MENU
 race_start_time = 0
 last_time = time.time()
+level_cleared = False
+cheat_mode = False # NEW: Cheat Mode Flag
 
 # Theme
 cyberpunk_mode = True  
 
 # Custom race settings
-custom_laps = 1
 custom_difficulty = 1  
 
 # Game features
@@ -35,8 +36,6 @@ current_level = 1
 max_level = 3 
 first_person_view = False
 races_won = 0
-current_lap = 1
-total_laps = 1
 
 # Track Config
 ROAD_WIDTH = 1200
@@ -121,11 +120,10 @@ class Jet:
         self.lap_time = 0
         self.race_time = 0
         self.crashed = False
-        self.laps_completed = 0
         self.has_shield = False
         
     def update(self, dt):
-        global coins_collected, current_lap, game_state
+        global coins_collected, game_state
         
         if self.crashed:
             if self.z > 0:
@@ -160,18 +158,10 @@ class Jet:
             else:
                 self.x = -ROAD_WIDTH / 2 + 50
         
-        # Lap logic
+        # Finish logic (Single Lap / Point-to-Point)
         if self.y >= FINISH_LINE_POSITION and not self.finished:
-            self.laps_completed += 1
-            if self.laps_completed >= total_laps:
-                self.finished = True
-                self.race_time = time.time() - race_start_time
-            else:
-                if self.is_player:
-                    self.y = 50
-                    current_lap = self.laps_completed + 1
-                else:
-                    self.y = random.uniform(50, 150)
+            self.finished = True
+            self.race_time = time.time() - race_start_time
     
     def check_collisions(self):
         global coins_collected, shield_token, game_state
@@ -240,7 +230,7 @@ all_jets = [player_jet] + ai_jets
 keys = {
     b'w': False, b's': False, b'a': False, b'd': False,
     b' ': False, b'r': False, b'p': False, b'v': False,
-    b'm': False
+    b'm': False, b'c': False
 }
 
 # --- FEATURE 4: FIRE BULLET ---
@@ -641,33 +631,41 @@ def draw_dashboard_hud():
     
     speed_knots = int(player_jet.speed * 20)
     draw_text_2d(20, WINDOW_HEIGHT - 40, f"Airspeed: {speed_knots} Knots")
-    draw_text_2d(20, WINDOW_HEIGHT - 70, f"Lap: {current_lap}/{total_laps}")
-    draw_text_2d(20, WINDOW_HEIGHT - 100, f"Score: {coins_collected}")
-    draw_text_2d(20, WINDOW_HEIGHT - 130, f"Level: {current_level}/{max_level}")
+    # REMOVED LAP COUNTER
+    draw_text_2d(20, WINDOW_HEIGHT - 70, f"Score: {coins_collected}")
+    draw_text_2d(20, WINDOW_HEIGHT - 100, f"Level: {current_level}/{max_level}")
     
     shield_status = "ACTIVE" if player_jet.has_shield else "OFFLINE"
-    draw_text_2d(20, WINDOW_HEIGHT - 160, f"SHIELD: {shield_status}")
+    draw_text_2d(20, WINDOW_HEIGHT - 130, f"SHIELD: {shield_status}")
     
+    # --- CHEAT MODE INDICATOR ---
+    if cheat_mode:
+        # Blinking effect for autopilot text
+        if int(time.time() * 2) % 2 == 0:
+             draw_text_2d(20, WINDOW_HEIGHT - 280, "AUTOPILOT ENGAGED")
+    # ----------------------------
+
     theme_text = "CYBERPUNK" if cyberpunk_mode else "STANDARD"
-    draw_text_2d(20, WINDOW_HEIGHT - 190, f"Theme: {theme_text}")
+    draw_text_2d(20, WINDOW_HEIGHT - 160, f"Theme: {theme_text}")
     
     distance_remaining = max(0, FINISH_LINE_POSITION - player_jet.y)
-    draw_text_2d(20, WINDOW_HEIGHT - 220, f"Distance: {int(distance_remaining)}m")
+    draw_text_2d(20, WINDOW_HEIGHT - 190, f"Distance: {int(distance_remaining)}m")
     
     if race_start_time > 0:
         current_race_time = time.time() - race_start_time
-        draw_text_2d(20, WINDOW_HEIGHT - 250, f"Time: {current_race_time:.1f}s")
+        draw_text_2d(20, WINDOW_HEIGHT - 220, f"Time: {current_race_time:.1f}s")
     
     position = 1
     for jet in ai_jets:
         if jet.y > player_jet.y and not jet.crashed:
             position += 1
-    draw_text_2d(20, WINDOW_HEIGHT - 280, f"Rank: {position}/4")
+    draw_text_2d(20, WINDOW_HEIGHT - 250, f"Rank: {position}/4")
     draw_text_2d(WINDOW_WIDTH - 250, WINDOW_HEIGHT - 30, "JET RACER 3D")
     draw_text_2d(WINDOW_WIDTH - 300, WINDOW_HEIGHT - 60, "W/S: Throttle")
     draw_text_2d(WINDOW_WIDTH - 300, WINDOW_HEIGHT - 80, "A/D: Bank Left/Right")
     draw_text_2d(WINDOW_WIDTH - 300, WINDOW_HEIGHT - 100, "M: Switch Theme")
     draw_text_2d(WINDOW_WIDTH - 300, WINDOW_HEIGHT - 120, "V: Camera | Click: Shoot")
+    draw_text_2d(WINDOW_WIDTH - 300, WINDOW_HEIGHT - 140, "C: Toggle Auto-Pilot")
 
 def draw_main_menu():
     if cyberpunk_mode:
@@ -699,18 +697,19 @@ def draw_custom_race_menu():
         
     draw_text_2d(WINDOW_WIDTH//2 - 100, WINDOW_HEIGHT//2 + 150, "CUSTOM SORTIE")
     draw_text_2d(WINDOW_WIDTH//2 - 130, WINDOW_HEIGHT//2 + 120, "==========================")
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 + 60, f"Laps: {custom_laps}")
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 + 40, "Press 1/2/3 for 1/3/5 laps")
+    
+    # REMOVED LAP SELECTION TEXT
+    
     difficulties = ["Cadet", "Pilot", "Ace"]
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2, f"Difficulty: {difficulties[custom_difficulty-1]}")
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 20, "Press Q/W/E for Cadet/Pilot/Ace")
+    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 + 40, f"Difficulty: {difficulties[custom_difficulty-1]}")
+    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 + 20, "Press Q/W/E for Cadet/Pilot/Ace")
     
     theme_status = f"Theme: {'Cyberpunk' if cyberpunk_mode else 'Standard'}"
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 80, theme_status)
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 100, "Press M to toggle Theme")
+    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 40, theme_status)
+    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 60, "Press M to toggle Theme")
     
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 140, "Press SPACE to Launch")
-    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 160, "Press ESC to return")
+    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 100, "Press SPACE to Launch")
+    draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 120, "Press ESC to return")
 
 def draw_game_complete():
     if cyberpunk_mode:
@@ -748,7 +747,52 @@ def handle_highway_controls(dt):
     if not keys[b'a'] and not keys[b'd']:
         player_jet.center_rotation()
 
-# --- FEATURE 4: MOUSE CLICK TO SHOOT ---
+# --- NEW: AUTO PILOT LOGIC ---
+def run_auto_pilot():
+    """Overrides manual controls to steer automatically"""
+    if player_jet.crashed:
+        return
+
+    # Always accelerate in auto-pilot
+    player_jet.accelerate()
+    
+    # 1. Look ahead for obstacles
+    scan_distance = 500  # How far ahead to look
+    safe_width = 100     # Width of the jet's path to check
+    nearest_threat = None
+    min_dist = 1000
+
+    for obs in obstacles:
+        if obs[1] < -100: continue # Skip old obstacles
+        
+        dy = obs[1] - player_jet.y
+        dx = obs[0] - player_jet.x
+        
+        # Check if obstacle is ahead and within danger width
+        if 0 < dy < scan_distance:
+            if abs(dx) < safe_width: 
+                if dy < min_dist:
+                    min_dist = dy
+                    nearest_threat = obs
+
+    # 2. React to threats
+    if nearest_threat:
+        # If obstacle is to our right, steer left. If left, steer right.
+        if nearest_threat[0] > player_jet.x:
+             player_jet.steer_left()
+        else:
+             player_jet.steer_right()
+    else:
+        # 3. Lane Centering / Stabilization (if no threat)
+        # Avoid hitting the side walls
+        if player_jet.x > ROAD_WIDTH/2 - 100:
+            player_jet.steer_left()
+        elif player_jet.x < -ROAD_WIDTH/2 + 100:
+            player_jet.steer_right()
+        else:
+            player_jet.center_rotation()
+# -----------------------------
+
 def mouse_click(button, state, x, y):
     if button == GLUT_LEFT_BUTTON and state == GLUT_DOWN:
         if game_state == RACING and not player_jet.crashed:
@@ -761,7 +805,6 @@ def initialize_race_cars():
     player_jet.bank_angle = 0
     player_jet.finished = False
     player_jet.crashed = False
-    player_jet.laps_completed = 0
     player_jet.speed = 0
     
     player_jet.has_shield = False
@@ -781,30 +824,50 @@ def initialize_race_cars():
         jet.bank_angle = 0
         jet.finished = False
         jet.crashed = False
-        jet.laps_completed = 0
         jet.speed = 0
+
+def start_next_level():
+    """Helper function to prepare and launch the next level"""
+    global game_state, race_start_time, level_cleared, ROAD_LENGTH, FINISH_LINE_POSITION
+    
+    level_up() # Increments level
+    
+    if game_state == GAME_COMPLETE:
+        return 
+
+    # Prepare next level
+    ROAD_LENGTH = 3000 + (current_level * 2000)
+    FINISH_LINE_POSITION = ROAD_LENGTH - 200
+    
+    initialize_race_cars()
+    generate_level_objects()
+    
+    level_cleared = False
+    game_state = RACING
+    race_start_time = time.time()
 
 def keyboard_down(key, x, y):
     global game_state, race_start_time, first_person_view, current_level, ROAD_LENGTH, FINISH_LINE_POSITION
-    global cyberpunk_mode, custom_laps, custom_difficulty, total_laps, current_lap
+    global cyberpunk_mode, custom_difficulty, level_cleared, cheat_mode
     
     if key == b'm':
         cyberpunk_mode = not cyberpunk_mode
+
+    # --- NEW: TOGGLE CHEAT MODE ---
+    if key == b'c' and game_state == RACING:
+        cheat_mode = not cheat_mode
+    # ------------------------------
         
     if game_state == GAME_COMPLETE:
         game_state = MENU
         return
         
     elif game_state == CUSTOM_RACE_MENU:
-        if key == b'1': custom_laps = 1
-        elif key == b'2': custom_laps = 3
-        elif key == b'3': custom_laps = 5
-        elif key == b'q': custom_difficulty = 1
+        # Removed Lap Selection keys
+        if key == b'q': custom_difficulty = 1
         elif key == b'w': custom_difficulty = 2
         elif key == b'e': custom_difficulty = 3
         elif key == b' ':
-            total_laps = custom_laps
-            current_lap = 1
             game_state = RACING
             race_start_time = time.time()
             ROAD_LENGTH = 3000 + (current_level * 2000)
@@ -816,14 +879,15 @@ def keyboard_down(key, x, y):
             
     elif key == b' ':
         if game_state == MENU:
-            total_laps = 1
-            current_lap = 1
             game_state = RACING
             race_start_time = time.time()
             ROAD_LENGTH = 3000 + (current_level * 2000)
             FINISH_LINE_POSITION = ROAD_LENGTH - 200
             generate_level_objects()
             initialize_race_cars()
+        # --- NEW: Press Space to Continue to Next Level ---
+        elif game_state == FINISHED and level_cleared:
+            start_next_level()
             
     elif key == b'b' and game_state == MENU:
         game_state = CUSTOM_RACE_MENU
@@ -871,27 +935,46 @@ def level_up():
         return
 
 def restart_highway_race():
-    global game_state, race_start_time, coins_collected, current_lap
-    current_lap = 1
+    """HARD RESET: Resets Level to 1 and Score to 0"""
+    global game_state, race_start_time, coins_collected, current_level, races_won, level_cleared
+    global ROAD_LENGTH, FINISH_LINE_POSITION, cheat_mode
+    
+    current_level = 1
+    coins_collected = 0
+    races_won = 0
+    level_cleared = False
+    cheat_mode = False # Reset cheat mode on restart
+    
+    ROAD_LENGTH = 3000 + (current_level * 2000)
+    FINISH_LINE_POSITION = ROAD_LENGTH - 200
+    
     initialize_race_cars()
     generate_level_objects()
     game_state = RACING
     race_start_time = time.time()
 
 def reset_to_new_game():
-    global current_level, races_won, coins_collected, game_state
+    global current_level, races_won, coins_collected, game_state, level_cleared, cheat_mode
     current_level = 1
     races_won = 0
     coins_collected = 0
+    level_cleared = False
+    cheat_mode = False
     global ROAD_LENGTH, FINISH_LINE_POSITION
     ROAD_LENGTH = 3000 + (current_level * 2000)
     FINISH_LINE_POSITION = ROAD_LENGTH - 200
     game_state = MENU
 
 def update_highway_game(dt):
-    global game_state
+    global game_state, level_cleared
     if game_state == RACING:
-        handle_highway_controls(dt)
+        # --- MODIFIED CONTROL LOGIC ---
+        if cheat_mode:
+            run_auto_pilot()
+        else:
+            handle_highway_controls(dt)
+        # ------------------------------
+        
         # Check Jet Collision
         for i, jet1 in enumerate(all_jets):
             if jet1.crashed:
@@ -900,11 +983,32 @@ def update_highway_game(dt):
                 if i >= j or jet2.crashed:
                     continue
                 if detect_car_collision(jet1, jet2):
-                    jet1.crashed = True
-                    jet2.crashed = True
-                    if jet1.is_player or jet2.is_player:
-                        game_state = FINISHED
-                        return
+                    # Identify if Player is involved
+                    player_involved = None
+                    enemy_involved = None
+                    
+                    if jet1.is_player:
+                        player_involved = jet1
+                        enemy_involved = jet2
+                    elif jet2.is_player:
+                        player_involved = jet2
+                        enemy_involved = jet1
+                    
+                    if player_involved:
+                        # SHIELD LOGIC: If player has shield, destroy enemy, consume shield, keep player alive
+                        if player_involved.has_shield:
+                            player_involved.has_shield = False
+                            enemy_involved.crashed = True
+                        else:
+                            player_involved.crashed = True
+                            enemy_involved.crashed = True
+                            game_state = FINISHED
+                            return
+                    else:
+                        # AI vs AI - both crash
+                        jet1.crashed = True
+                        jet2.crashed = True
+
         player_jet.update(dt)
         update_bullets(dt) # Move bullets
         update_ai_racers(dt)
@@ -915,7 +1019,10 @@ def update_highway_game(dt):
                     player_won = False
                     break
             if player_won:
-                level_up()
+                # --- CHANGE: Do not level up immediately ---
+                # level_up() 
+                level_cleared = True
+                # -------------------------------------------
             game_state = FINISHED
 
 def display():
@@ -957,19 +1064,28 @@ def display():
                     player_won = False
                     break
             if player_won:
-                if current_level >= max_level:
+                # --- NEW DISPLAY LOGIC FOR LEVEL CLEARED ---
+                if current_level >= max_level and level_cleared:
                     draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 + 60, "CAMPAIGN COMPLETE")
+                    draw_text_2d(WINDOW_WIDTH//2 - 100, WINDOW_HEIGHT//2 + 30, "PRESS SPACE TO FINISH")
                 else:
                     draw_text_2d(WINDOW_WIDTH//2 - 60, WINDOW_HEIGHT//2 + 60, "ZONE CLEARED")
-                    draw_text_2d(WINDOW_WIDTH//2 - 100, WINDOW_HEIGHT//2 + 30, f"Advancing to Level {current_level}!")
-                draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 20, f"Score: {coins_collected}")
+                    draw_text_2d(WINDOW_WIDTH//2 - 120, WINDOW_HEIGHT//2 + 30, f"Next Objective: Level {current_level + 1}")
+                    draw_text_2d(WINDOW_WIDTH//2 - 120, WINDOW_HEIGHT//2, "PRESS SPACE TO CONTINUE")
+                
+                draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 40, f"Score: {coins_collected}")
             else:
                 draw_text_2d(WINDOW_WIDTH//2 - 60, WINDOW_HEIGHT//2 + 30, "MISSION FAILED")
                 draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2, "You were outflown!")
+        
         if player_jet.finished:
-            draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 50, f"Time: {player_jet.race_time:.2f}s")
-        draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 80, "Press R to Retry")
-        draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 110, "Press ESC for Base")
+            draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 70, f"Time: {player_jet.race_time:.2f}s")
+        
+        # Only show these if NOT waiting for Space press
+        if not level_cleared:
+            draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 100, "Press R to Restart Campaign")
+            draw_text_2d(WINDOW_WIDTH//2 - 80, WINDOW_HEIGHT//2 - 130, "Press ESC for Base")
+            
     glutSwapBuffers()
 
 def idle():
