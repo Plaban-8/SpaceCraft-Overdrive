@@ -1,0 +1,14 @@
+glPushAttrib(GL_ALL_ATTRIB_BITS)
+glDisable(GL_DEPTH_TEST)
+glDisable(GL_LIGHTING)
+glPopAttrib
+glutSolidTorus
+glutSolidSphere
+glutSolidCone
+glDisable(GL_BLEND)
+glClearColor
+glEnable(GL_LIGHTING)
+glEnable(GL_LIGHT0)
+glLightfv(GL_LIGHT0, GL_POSITION, [100, 100, 200, 1])
+glEnable(GL_COLOR_MATERIAL)
+glutKeyboardUpFunc
